@@ -1,0 +1,7 @@
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/install/local.dir
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/install.dir
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/apriltags.dir
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/list_install_components.dir
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/install/strip.dir
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/edit_cache.dir
+/home/multipurpose/Design2/apriltags-master/build/CMakeFiles/rebuild_cache.dir

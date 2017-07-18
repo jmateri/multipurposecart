@@ -1,0 +1,99 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/include/opencv2/highgui.hpp",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/include/opencv2/highgui/highgui.hpp",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/include/opencv2/highgui/highgui_c.h",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/src/window.cpp",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/src/window_QT.cpp",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/src/window_QT.h",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/build/modules/highgui/qrc_window_QT.cpp",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/src/precomp.hpp",
+			"labels" : 
+			[
+				"Main",
+				"opencv_highgui",
+				"Module"
+			]
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/build/cvconfig.h"
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/build/opencv2/opencv_modules.hpp"
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/build/modules/highgui/opencv_highgui_automoc.cpp"
+		},
+		{
+			"file" : "/home/multipurpose/Design2/OpenCV/modules/highgui/src/window_QT.qrc"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"Main",
+			"opencv_highgui",
+			"Module"
+		],
+		"name" : "opencv_highgui"
+	}
+}
