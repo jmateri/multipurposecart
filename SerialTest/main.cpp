@@ -4,6 +4,7 @@
 #include <QDebug>
 int main(int argc, char *argv[])
 {
+    QString portName;
     QCoreApplication a(argc, argv);
 
     QList<QSerialPortInfo> info = QSerialPortInfo::availablePorts();
@@ -11,12 +12,13 @@ int main(int argc, char *argv[])
     for(int i=0; i<info.length(); i++)
     {
         qDebug() << info.at(i).portName();
+        portName = info.at(i).portName();
     }
 
     QSerialPort *port = new QSerialPort();
 
     qDebug() << "Configuring SerialPort" ;
-    port->setPortName("ttyACM0");
+    port->setPortName(portName);
     if(port->isOpen())
     {
         port->close();

@@ -81,7 +81,6 @@ int main(int argc, char *argv[])
 
     //Paramenters we added
     bool arduino = true;
-    bool dac = false;
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
     double tagSize = 0.094; // April tag side length in meters of square black frame
@@ -146,7 +145,8 @@ int main(int argc, char *argv[])
     td->refine_decode = getopt_get_bool(getopt, "refine-decode");
     td->refine_pose = getopt_get_bool(getopt, "refine-pose");
     QSerialPort port;
-    QByteArray array;
+    QByteArray outputArrayLeft;
+    QByteArray outputArrayRight;
     if(arduino)
     {
         port.setPortName("ttyACM0");
@@ -237,51 +237,57 @@ int main(int argc, char *argv[])
                 if(distance > 2)
                     distance = 2;
                 char output;
-                array.clear();
+                outputArrayLeft.clear();
+                outputArrayRight.clear();
+                outputArrayLeft.append(255);
+                outputArrayRight.append((char) 0);
+
                 if (distance > 1.2)
                 {
                     output = (char)(((distance-1.2) *158.75)+127);
-                    if(output > 255)
+                    if(output >= 255)
                     {
-                        output = 255;
+                        output = 254;
                     }
-                    array.append(output);
+                    outputArrayLeft.append(output);
+                    outputArrayRight.append(output+50);
                 }
                 else if(distance >= .8 && distance <= 1.2)
                 {
                     output = 127;
-                    array.append(output);
+                    outputArrayLeft.append(output);
+                    outputArrayRight.append(output+50);
                 }
                 else
                 {
                     output = (char)(((distance) *158.75));
-                    if(output < 0)
+                    if(output <= 0)
                     {
-                        output = 0;
+                        output = 1;
                     }
-                    array.append(output);
+                    outputArrayLeft.append(output);
+                    outputArrayRight.append(output+50);
                 }
-                if (showInfo)
+                if (false)
                 {
-                    qDebug() << output;
+                    qDebug() << (int) output;
                 }
-                port.write(array);
-                port.flush();
-                port.waitForBytesWritten(50);
-            }
-            if (dac)
-            {
 
+                qDebug() << port.write(outputArrayLeft);
+                port.flush();
+                qDebug() << port.write(outputArrayRight);
+                port.flush();
+                //port.waitForBytesWritten(50);
             }
             if (showInfo)
             {
-                cout << "  distance= " << distance
-                     << " m, x= " << translation(0)
-                     << ", y= " << translation(1)
-                     << ", z= " << translation(2)
-                     << ", yaw= " << yaw
-                     << ", pitch= " << pitch
-                     << ", roll= " << roll
+                cout << "  distance= " << distance  // norm of x,y,z
+                     << " m, x= " << translation(0) // distance from camera
+                     << ", y= " << translation(1)  // horizontal movement
+                     << ", z= " << translation(2)  // vertical movenemtn
+                     << ", yaw= " << yaw  // rotation about the center
+                     << ", pitch= " << pitch // rotation about a vertical axis
+                     << ", roll= " << roll  // rotation about a horizontal axis
                      << endl;
             }
             if (debugging) // if true displays all current camera view and adds information to each frame

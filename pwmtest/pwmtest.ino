@@ -1,12 +1,17 @@
-int analogPin = 2;   // potentiometer connected to analog pin 3
-int incomingByte = 0;
+int analogPin1 = 2;
+int analogPin2 = 3;// potentiometer connected to analog pin 3
+int incomingByte1 = 0;
+int incomingByte2 = 0;
+long unsigned int elapsedTime;
 
 
 void setup()
 {
-  pinMode(analogPin, OUTPUT);   // sets the pin as output
+  pinMode(analogPin1, OUTPUT);   // sets the pin as output
+  pinMode(analogPin2, OUTPUT);
   
-  analogWrite(analogPin, 127);
+  analogWrite(analogPin1, 127);
+  analogWrite(analogPin2, 127);
   Serial.begin(9600);
   //pinMode(LED_BUILTIN, OUTPUT);
 }
@@ -15,35 +20,37 @@ void setup()
 
 void loop()
 {
-  if (Serial.available() > 0)
+  if (Serial.available() > 1)
   {
-    //analogWrite(analogPin, 127);
-    // read the incoming byte:
-    incomingByte = Serial.read();
-    Serial.flush();
-//    digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-//    delay(1000);                       // wait for a second
-//    digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-//    delay(1000);  
-    // say what you got:
-    //    if (incomingByte == 64)
-    //    {
-    //}
-    //analogWrite(analogPin, incomingByte % 255);
-//    Serial.print("I received: ");
-//    Serial.println(incomingByte, DEC);
-    if(incomingByte > 255)
-    {
-      incomingByte = 255;
-    }
-    if(incomingByte < 0)
-    {
-      incomingByte = 0;
-    }
+    incomingByte1 = Serial.read();
     
-    analogWrite(analogPin, incomingByte);
-
+    if(incomingByte1 == 255 || incomingByte1 == 0)
+    {
+     incomingByte2 = Serial.read();
+     if(incomingByte2 > 254)
+     {
+       incomingByte2 = 254;
+     }
+     if(incomingByte2 < 1)
+     {
+       incomingByte2 = 1;
+     }
+  
+    if(incomingByte1 == 255)
+    {
+      analogWrite(analogPin1, incomingByte2);
+    }
+    else if(incomingByte1 == 0)
+    {
+      analogWrite(analogPin2, incomingByte2);
+    }   
+    elapsedTime = millis(); 
+   }
   }
-   
-
+  if(millis() - elapsedTime > 1000)
+  {
+    analogWrite(analogPin1, 127);
+    analogWrite(analogPin2, 127);
+    while(Serial.available() == 0);
+  }
 }
