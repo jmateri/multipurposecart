@@ -10,8 +10,8 @@ void setup()
   pinMode(analogPin1, OUTPUT);   // sets the pin as output
   pinMode(analogPin2, OUTPUT);
   
-  analogWrite(analogPin1, 127);
-  analogWrite(analogPin2, 127);
+  analogWrite(analogPin1, 125);
+  analogWrite(analogPin2, 125);
   Serial.begin(9600);
   //pinMode(LED_BUILTIN, OUTPUT);
 }
@@ -20,6 +20,11 @@ void setup()
 
 void loop()
 {
+//  for(int i=0; i <= 255; i++){
+//    analogWrite(analogPin1, i);
+//    analogWrite(analogPin2, i);
+//    delay(100);
+//  }
   if (Serial.available() > 1)
   {
     incomingByte1 = Serial.read();
@@ -49,8 +54,8 @@ void loop()
   }
   if(millis() - elapsedTime > 1000)
   {
-    analogWrite(analogPin1, 127);
-    analogWrite(analogPin2, 127);
+    analogWrite(analogPin1, 125);
+    analogWrite(analogPin2, 125);
     while(Serial.available() == 0);
   }
 }

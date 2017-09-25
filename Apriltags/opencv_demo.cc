@@ -46,6 +46,7 @@ either expressed or implied, of the Regents of The University of Michigan.
 #include <QtSerialPort/QSerialPort>
 #include <QSerialPortInfo>
 #include <QDebug>
+#include <QTime>
 using namespace std;
 using namespace cv;
 
@@ -83,11 +84,14 @@ int main(int argc, char *argv[])
     bool arduino = true;
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
+    bool showFps = true;
+    bool horizontal = false;
     double tagSize = 0.094; // April tag side length in meters of square black frame
     double fx = 532.8497; // camera focal length in pixels
     double fy = 535.1190;
     double px = 312.4166; // camera principal point
     double py = 226.0692;
+    double horizontalPosition;
 
     // Checks console for paramenters
     if (!getopt_parse(getopt, argc, argv, 1) ||  getopt_get_bool(getopt, "help"))
@@ -162,6 +166,12 @@ int main(int argc, char *argv[])
         qDebug() << "SetFlowControl: " << port.setFlowControl(QSerialPort::NoFlowControl);
     }
     Mat frame, gray;
+    int frameCount;
+    QTime timer;
+    if (showFps)
+    {
+        timer.start();
+    }
     while (true)
     {
         //Takes the frame and changes it to grayscale
@@ -173,6 +183,16 @@ int main(int argc, char *argv[])
 
         //puts all the detected tags into a zarray
         zarray_t *detections = apriltag_detector_detect(td, &im);
+        if (showFps)
+        {
+            frameCount++;
+            if (timer.elapsed() >= 1000)
+            {
+                cout << frameCount << " Fps"<< endl;
+                timer.restart();
+                frameCount = 0;
+            }
+        }
         if (showInfo)
         {
             cout << zarray_size(detections) << " tags detected" << endl;
@@ -236,12 +256,15 @@ int main(int argc, char *argv[])
             {
                 if(distance > 2)
                     distance = 2;
+                char outputRight;
+                char outputLeft;
                 char output;
+                int turnConstant = 40;
                 outputArrayLeft.clear();
                 outputArrayRight.clear();
                 outputArrayLeft.append(255);
                 outputArrayRight.append((char) 0);
-
+                horizontalPosition = translation(1);
                 if (distance > 1.2)
                 {
                     output = (char)(((distance-1.2) *158.75)+127);
@@ -249,14 +272,46 @@ int main(int argc, char *argv[])
                     {
                         output = 254;
                     }
-                    outputArrayLeft.append(output);
-                    outputArrayRight.append(output+50);
+                    if (horizontal)
+                    {
+                        if (horizontalPosition > 0)
+                        {
+                            outputLeft = output + horizontalPosition * turnConstant;
+                        }
+                        else
+                        {
+                            outputRight = output + horizontalPosition * -1 * turnConstant;
+                        }
+                    }
+                    else
+                    {
+                        outputRight = output;
+                        outputLeft = output;
+                    }
+                    outputArrayLeft.append(outputLeft);
+                    outputArrayRight.append(outputRight);
                 }
                 else if(distance >= .8 && distance <= 1.2)
                 {
                     output = 127;
-                    outputArrayLeft.append(output);
-                    outputArrayRight.append(output+50);
+                    if (horizontal)
+                    {
+                        if (horizontalPosition > 0)
+                        {
+                            outputLeft = output + horizontalPosition * turnConstant;
+                        }
+                        else
+                        {
+                            outputRight = output + horizontalPosition * -1 * turnConstant;
+                        }
+                    }
+                    else
+                    {
+                        outputRight = output;
+                        outputLeft = output;
+                    }
+                    outputArrayLeft.append(outputLeft);
+                    outputArrayRight.append(outputRight);
                 }
                 else
                 {
@@ -265,8 +320,24 @@ int main(int argc, char *argv[])
                     {
                         output = 1;
                     }
-                    outputArrayLeft.append(output);
-                    outputArrayRight.append(output+50);
+                    if (horizontal)
+                    {
+                        if (horizontalPosition > 0)
+                        {
+                            outputLeft = output + horizontalPosition * turnConstant;
+                        }
+                        else
+                        {
+                            outputRight = output + horizontalPosition * -1 * turnConstant;
+                        }
+                    }
+                    else
+                    {
+                        outputRight = output;
+                        outputLeft = output;
+                    }
+                    outputArrayLeft.append(outputLeft);
+                    outputArrayRight.append(outputRight);
                 }
                 if (false)
                 {
