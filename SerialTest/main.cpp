@@ -12,6 +12,9 @@ int main(int argc, char *argv[])
     for(int i=0; i<info.length(); i++)
     {
         qDebug() << info.at(i).portName();
+        qDebug() << info.at(i).manufacturer();
+        qDebug() << info.at(i).productIdentifier();
+        qDebug() << info.at(i).vendorIdentifier();
         portName = info.at(i).portName();
     }
 

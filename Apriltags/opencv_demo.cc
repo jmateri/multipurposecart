@@ -84,8 +84,8 @@ int main(int argc, char *argv[])
     bool arduino = true;
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
-    bool showFps = true;
-    bool horizontal = false;
+    bool showFps = false;
+    bool horizontal = true;
     double tagSize = 0.094; // April tag side length in meters of square black frame
     double fx = 532.8497; // camera focal length in pixels
     double fy = 535.1190;
@@ -148,12 +148,30 @@ int main(int argc, char *argv[])
     td->refine_edges = getopt_get_bool(getopt, "refine-edges");
     td->refine_decode = getopt_get_bool(getopt, "refine-decode");
     td->refine_pose = getopt_get_bool(getopt, "refine-pose");
+    // Initalize variables for sending stuff over serial port
     QSerialPort port;
     QByteArray outputArrayLeft;
     QByteArray outputArrayRight;
+    // If we want to send stuff to arduino
     if(arduino)
     {
-        port.setPortName("ttyACM0");
+        QList<QSerialPortInfo> info = QSerialPortInfo::availablePorts();
+
+        int i;
+        for(i=0; i<info.length(); i++)
+        {
+            if (info.at(i).productIdentifier() == 66 && info.at(i).vendorIdentifier() == 9025)
+            {
+                port.setPortName(info.at(i).portName());
+                break;
+            }
+        }
+        if( i == info.length())
+        {
+            qDebug() << "No Device Found";
+            return 1;
+        }
+        // Open port of the arduino
         if(port.isOpen())
         {
             port.close();
@@ -164,6 +182,7 @@ int main(int argc, char *argv[])
         qDebug() << "SetParity: " << port.setParity(QSerialPort::NoParity);
         qDebug() << "SetStopBits: " << port.setStopBits(QSerialPort::OneStop);
         qDebug() << "SetFlowControl: " << port.setFlowControl(QSerialPort::NoFlowControl);
+
     }
     Mat frame, gray;
     int frameCount;
@@ -177,10 +196,8 @@ int main(int argc, char *argv[])
         //Takes the frame and changes it to grayscale
         cap >> frame;
         cvtColor(frame, gray, COLOR_BGR2GRAY);
-
         // Make an image_u8_t header for the Mat data
         image_u8_t im = { .width = gray.cols, .height = gray.rows, .stride = gray.cols, .buf = gray.data };
-
         //puts all the detected tags into a zarray
         zarray_t *detections = apriltag_detector_detect(td, &im);
         if (showFps)
@@ -201,7 +218,6 @@ int main(int argc, char *argv[])
         // Loops through all the detections
         for (int i = 0; i < zarray_size(detections); i++)
         {
-
             // Creates an apriltag detection pointer and gets a detection
             apriltag_detection_t *det;
             zarray_get(detections, i, &det);
@@ -217,7 +233,6 @@ int main(int argc, char *argv[])
             imgPts.push_back(cv::Point2f(det->p[1][0], det->p[1][1]));
             imgPts.push_back(cv::Point2f(det->p[2][0], det->p[2][1]));
             imgPts.push_back(cv::Point2f(det->p[3][0], det->p[3][1]));
-
             cv::Mat rvec, tvec;
             cv::Matx33f cameraMatrix( fx, 0, px, 0, fy, py, 0,  0,  1);
             cv::Vec4f distParam(0,0,0,0);
