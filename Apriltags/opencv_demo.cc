@@ -31,7 +31,6 @@ either expressed or implied, of the Regents of The University of Michigan.
 */
 
 #include <iostream>
-
 #include "opencv2/opencv.hpp"
 #include <eigen3/Eigen/Dense>
 #include "apriltag.h"
@@ -41,6 +40,7 @@ either expressed or implied, of the Regents of The University of Michigan.
 #include "tag25h9.h"
 #include "tag25h7.h"
 #include "getopt.h"
+#include <math.h>
 #include <cmath>
 #include <QCoreApplication>
 #include <QtSerialPort/QSerialPort>
@@ -85,8 +85,8 @@ int main(int argc, char *argv[])
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
     bool showFps = false;
-    bool horizontal = true;
-    double tagSize = 0.094; // April tag side length in meters of square black frame
+    bool horizontal = false;
+    double tagSize = 0.129; // April tag side length in meters of square black frame  (old one is .094)
     double fx = 532.8497; // camera focal length in pixels
     double fy = 535.1190;
     double px = 312.4166; // camera principal point
@@ -241,7 +241,6 @@ int main(int argc, char *argv[])
             cv::Rodrigues(rvec, r);
             Eigen::Matrix3d wRo;
             wRo << r(0,0), r(0,1), r(0,2), r(1,0), r(1,1), r(1,2), r(2,0), r(2,1), r(2,2);
-
             Eigen::Matrix4d T;
             T.topLeftCorner(3,3) = wRo;
             T.col(3).head(3) << tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2);
@@ -269,8 +268,8 @@ int main(int argc, char *argv[])
             distance = translation.norm();
             if (arduino)
             {
-                if(distance > 2)
-                    distance = 2;
+                if(distance > 4)
+                    distance = 4;
                 char outputRight;
                 char outputLeft;
                 char output;
@@ -282,82 +281,76 @@ int main(int argc, char *argv[])
                 horizontalPosition = translation(1);
                 if (distance > 1.2)
                 {
-                    output = (char)(((distance-1.2) *158.75)+127);
+                   // output = (char)(((distance-1.2) *158.75)+127);
+                    output = (char) 81.64 + 45.35 * distance;
+                  // output = (char) ((distance * ((16.199 * distance) - 38.8776)) + 150.327);
                     if(output >= 255)
                     {
                         output = 254;
                     }
-                    if (horizontal)
-                    {
-                        if (horizontalPosition > 0)
-                        {
-                            outputLeft = output + horizontalPosition * turnConstant;
-                        }
-                        else
-                        {
-                            outputRight = output + horizontalPosition * -1 * turnConstant;
-                        }
-                    }
                     else
                     {
                         outputRight = output;
                         outputLeft = output;
                     }
-                    outputArrayLeft.append(outputLeft);
-                    outputArrayRight.append(outputRight);
                 }
                 else if(distance >= .8 && distance <= 1.2)
                 {
                     output = 127;
-                    if (horizontal)
-                    {
-                        if (horizontalPosition > 0)
-                        {
-                            outputLeft = output + horizontalPosition * turnConstant;
-                        }
-                        else
-                        {
-                            outputRight = output + horizontalPosition * -1 * turnConstant;
-                        }
-                    }
-                    else
                     {
                         outputRight = output;
                         outputLeft = output;
                     }
-                    outputArrayLeft.append(outputLeft);
-                    outputArrayRight.append(outputRight);
                 }
                 else
-                {
-                    output = (char)(((distance) *158.75));
+                {           // half of original scale factor
+                    output = (char)(96.25 * distance + 50);
                     if(output <= 0)
                     {
                         output = 1;
                     }
-                    if (horizontal)
-                    {
-                        if (horizontalPosition > 0)
-                        {
-                            outputLeft = output + horizontalPosition * turnConstant;
-                        }
-                        else
-                        {
-                            outputRight = output + horizontalPosition * -1 * turnConstant;
-                        }
-                    }
                     else
                     {
                         outputRight = output;
                         outputLeft = output;
                     }
-                    outputArrayLeft.append(outputLeft);
-                    outputArrayRight.append(outputRight);
+
+
+
                 }
-                if (false)
+
+                if(distance > .8)
                 {
-                    qDebug() << (int) output;
+                    if(translation(1) < -0.1)
+                    {
+                        outputRight = fmin(254,(int)(((unsigned char)outputRight) + 20));
+                        outputLeft = fmax(1,(int)(((unsigned char)outputLeft) - 20));
+
+                        qDebug() << (unsigned char) outputRight<< " Right";
+                        qDebug() << (unsigned char) outputLeft << " Left";
+
+
+
+                    }
+                    else if(translation(1) > .1)
+                    {
+                        outputLeft = fmin(254,(int)(((unsigned char)outputLeft) + 20));
+                        outputRight =  fmax(1,(int)(((unsigned char)outputRight) - 20));
+
+                        qDebug() << (unsigned char) outputRight << " Right2";
+                        qDebug() << (unsigned char) outputLeft << " Left2";
+                    }
+
+
                 }
+                outputArrayLeft.append(outputLeft);
+                outputArrayRight.append(outputRight);
+                if (true)
+                {
+                    qDebug() << (int) output + 127;
+                }
+
+
 
                 qDebug() << port.write(outputArrayLeft);
                 port.flush();
@@ -370,7 +363,7 @@ int main(int argc, char *argv[])
                 cout << "  distance= " << distance  // norm of x,y,z
                      << " m, x= " << translation(0) // distance from camera
                      << ", y= " << translation(1)  // horizontal movement
-                     << ", z= " << translation(2)  // vertical movenemtn
+                     << ", z= " << translation(2)  // vertical movement
                      << ", yaw= " << yaw  // rotation about the center
                      << ", pitch= " << pitch // rotation about a vertical axis
                      << ", roll= " << roll  // rotation about a horizontal axis
@@ -402,7 +395,6 @@ int main(int argc, char *argv[])
             waitKey(1);
         }
     }
-
     apriltag_detector_destroy(td);
     if (!strcmp(famname, "tag36h11"))
         tag36h11_destroy(tf);
@@ -415,6 +407,5 @@ int main(int argc, char *argv[])
     else if (!strcmp(famname, "tag25h7"))
         tag25h7_destroy(tf);
     getopt_destroy(getopt);
-
     return 0;
 }
