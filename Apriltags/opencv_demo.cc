@@ -84,9 +84,8 @@ int main(int argc, char *argv[])
     bool arduino = true;
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
-    bool showFps = false;
-    bool horizontal = false;
-    double tagSize = 0.129; // April tag side length in meters of square black frame  (old one is .094)
+    bool showFps = true;
+    double tagSize = 0.127; // April tag side length in meters of square black frame  (old one is .094)
     double fx = 532.8497; // camera focal length in pixels
     double fy = 535.1190;
     double px = 312.4166; // camera principal point
@@ -319,26 +318,64 @@ int main(int argc, char *argv[])
 
                 }
 
-                if(distance > .8)
+                double angle = abs(atan(translation(1)/translation(0)) * (180 / 3.14159));
+                qDebug() << angle << " Angle";
+                double turnDifference =  (((-55.0 / 1369.0) * pow(angle - 40, 2)) + 60);
+                double straightOffset = translation(0) * 15.0;
+
+                if(distance > 0 && true)
                 {
-                    if(translation(1) < -0.1)
+                    if(distance < 2 && (angle > 5) && (translation(1) < 0))
                     {
-                        outputRight = fmin(254,(int)(((unsigned char)outputRight) + 20));
-                        outputLeft = fmax(1,(int)(((unsigned char)outputLeft) - 20));
+                        outputRight = fmin(254,(int)((unsigned char)outputRight + angle * 3));
+                           // (translation(0) * 10));
+                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - angle * 3));
+                    }
+                    else if(distance < 2 && (angle > 5) && (translation(1) > 0))
+                    {
+                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + angle * 3));
+                          //  (translation(0) * 10));;
+                        outputRight =  fmax(1,(int)((unsigned char)outputRight - angle * 3));
+                    }
+                    else if((angle > 3) && (translation(1) < 0))
+                    {
+//                        outputRight = fmin(254,(int)(((unsigned char)outputRight) + 2.5 * angle));
+//                        outputLeft = fmax(1,(int)(((unsigned char)outputLeft) - 2.5 * angle));
 
-                        qDebug() << (unsigned char) outputRight<< " Right";
-                        qDebug() << (unsigned char) outputLeft << " Left";
+//                        qDebug() << (unsigned char) outputRight<< " Right";
+//                        qDebug() << (unsigned char) outputLeft << " Left";
 
+                        outputRight = fmin(254,(int)((unsigned char)outputRight + turnDifference));
+                           // (translation(0) * 10));
+                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - turnDifference));
 
+                        if(turnDifference > straightOffset)
+                        {
+                            outputRight -= straightOffset;
+                            outputLeft += straightOffset;
+                        }
+
+                           // (translation(0) * 10));
 
                     }
-                    else if(translation(1) > .1)
+                    else if((angle > 3) && (translation(1) > 0))
                     {
-                        outputLeft = fmin(254,(int)(((unsigned char)outputLeft) + 20));
-                        outputRight =  fmax(1,(int)(((unsigned char)outputRight) - 20));
+//                        outputLeft = fmin(254,(int)(((unsigned char)outputLeft) + 2.5 * angle));
+//                        outputRight =  fmax(1,(int)(((unsigned char)outputRight) - 2.5 * angle));
 
-                        qDebug() << (unsigned char) outputRight << " Right2";
-                        qDebug() << (unsigned char) outputLeft << " Left2";
+//                        qDebug() << (unsigned char) outputRight << " Right2";
+//                        qDebug() << (unsigned char) outputLeft << " Left2";
+
+
+                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + turnDifference));
+                          //  (translation(0) * 10));;
+                        outputRight =  fmax(1,(int)((unsigned char)outputRight - turnDifference));
+                          //  (translation(0) * 10));;
+                        if(turnDifference > straightOffset)
+                        {
+                            outputRight -= straightOffset;
+                            outputLeft += straightOffset;
+                        }
                     }
 
 

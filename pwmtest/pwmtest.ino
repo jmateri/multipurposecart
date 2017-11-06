@@ -1,35 +1,40 @@
-int analogPin1 = 2;
-int analogPin2 = 3;// potentiometer connected to analog pin 3
-int stopPin = 18;
+/*
+ * Copyright 2017 Jonathan Materi & Nick DeNomme 
+ */
+
+const int analogPin2 = 2;
+const int analogPin3 = 3;
+const int analogPin7 = 7;
+const int analogPin8 = 8;
+const int stopPin = 18;
 
 int incomingByte1 = 0;
 int incomingByte2 = 0;
 long unsigned int elapsedTime;
 volatile bool startMovement = true;
 
+void inline timeoutCart();
+void inline outputStopCart();
+
 void setup()
 {
-  pinMode(analogPin1, OUTPUT);   // sets the pin as output
-  pinMode(analogPin2, OUTPUT);
+  pinMode(analogPin2, OUTPUT);   // sets the pin as output
+  pinMode(analogPin3, OUTPUT);
+//  pinMode(analogPin4, OUTPUT);   // sets the pin as output
+//  pinMode(analogPin5, OUTPUT);
 
   pinMode(stopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(stopPin), stopCart, RISING);
   
-  analogWrite(analogPin1, 127);
-  analogWrite(analogPin2, 127);
+  outputStopCart();
   Serial.begin(9600);
-  //pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 
 
 void loop()
 {
-//  for(int i=0; i <= 255; i++){
-//    analogWrite(analogPin1, i);
-//    analogWrite(analogPin2, i);
-//    delay(100);
-//  }
   if (Serial.available() > 1)
   {
     incomingByte1 = Serial.read();
@@ -48,26 +53,68 @@ void loop()
   
     if(incomingByte1 == 255 && startMovement)
     {
-      analogWrite(analogPin1, incomingByte2);
+      if(incomingByte2 >= 127)
+      {
+        incomingByte2 -= 127;
+        incomingByte2 <<= 1;
+        analogWrite(analogPin3, 0);
+        analogWrite(analogPin2, incomingByte2);
+        
+      }
+      else
+      {
+        incomingByte2 = 127 - incomingByte2;
+        incomingByte2 <<= 1;
+        analogWrite(analogPin2, 0);
+        analogWrite(analogPin3, incomingByte2);
+      }
     }
     else if(incomingByte1 == 0 && startMovement)
     {
-      analogWrite(analogPin2, incomingByte2);
+      if(incomingByte2 >= 127)
+      {
+        incomingByte2 -= 127;
+        incomingByte2 <<= 1;
+        analogWrite(analogPin7, incomingByte2);
+        analogWrite(analogPin8, 0);
+      }
+      else
+      {
+        incomingByte2 = 127 - incomingByte2;
+        incomingByte2 <<= 1;
+        analogWrite(analogPin7, 0);
+        analogWrite(analogPin8, incomingByte2);
+      }
     }   
     elapsedTime = millis(); 
    }
   }
-  if(millis() - elapsedTime > 1000 && startMovement)
+  timeoutCart();
+}
+
+void inline outputStopCart()
+{
+  analogWrite(analogPin2, 0);
+  analogWrite(analogPin3, 0);
+  analogWrite(analogPin7, 0);
+  analogWrite(analogPin8, 0);
+}
+
+void inline timeoutCart()
+{
+  if((millis() - elapsedTime > 333) && startMovement)
   {
-    analogWrite(analogPin1, 130);
-    analogWrite(analogPin2, 130);
+    outputStopCart();
     while(Serial.available() == 0);
   }
 }
 
 void stopCart()
 {
-  analogWrite(analogPin1, 127);
-  analogWrite(analogPin2, 127);
+  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+  delay(1000);                       // wait for a second
+  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+  delay(1000);  
+ outputStopCart();
  startMovement = !startMovement; 
 }
