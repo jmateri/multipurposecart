@@ -7,6 +7,9 @@ const int analogPin3 = 3;
 const int analogPin7 = 7;
 const int analogPin8 = 8;
 const int stopPin = 18;
+const int manualForwardPin = 19;
+const int manualBackwardPin = 20;
+const int manualTurnPin = 21;
 
 int incomingByte1 = 0;
 int incomingByte2 = 0;
@@ -20,15 +23,22 @@ void setup()
 {
   pinMode(analogPin2, OUTPUT);   // sets the pin as output
   pinMode(analogPin3, OUTPUT);
-//  pinMode(analogPin4, OUTPUT);   // sets the pin as output
-//  pinMode(analogPin5, OUTPUT);
+  pinMode(analogPin7, OUTPUT);   // sets the pin as output
+  pinMode(analogPin8, OUTPUT);
 
   pinMode(stopPin, INPUT_PULLUP);
+  pinMode(manualForwardPin, INPUT_PULLUP);
+  pinMode(manualBackwardPin, INPUT_PULLUP);
+  pinMode(manualTurnPin, INPUT_PULLUP);
+  
   attachInterrupt(digitalPinToInterrupt(stopPin), stopCart, RISING);
+  attachInterrupt(digitalPinToInterrupt(manualForwardPin), manualForwardStart, RISING);
+  attachInterrupt(digitalPinToInterrupt(manualBackwardPin), manualBackwardStart, RISING);
+  attachInterrupt(digitalPinToInterrupt(manualTurnPin), manualTurnStart, RISING);
   
   outputStopCart();
+  
   Serial.begin(9600);
-  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 
@@ -118,3 +128,52 @@ void stopCart()
  outputStopCart();
  startMovement = !startMovement; 
 }
+
+void manualForwardStart()
+{
+  detachInterrupt(digitalPinToInterrupt(manualForwardPin));
+  attachInterrupt(digitalPinToInterrupt(manualForwardPin), interruptStop, FALLING);
+  if(!startMovement)
+  {
+    analogWrite(analogPin2, 75);
+    analogWrite(analogPin3, 0);
+    analogWrite(analogPin7, 75);
+    analogWrite(analogPin8, 0);
+  }
+}
+
+void manualBackwardStart()
+{
+  detachInterrupt(digitalPinToInterrupt(manualBackwardPin));
+  attachInterrupt(digitalPinToInterrupt(manualBackwardPin), interruptStop, FALLING);
+  if(!startMovement)
+  {
+    analogWrite(analogPin2, 0);
+    analogWrite(analogPin3, 100);
+    analogWrite(analogPin7, 0);
+    analogWrite(analogPin8, 100);
+  }
+}
+
+void manualTurnStart()
+{
+  detachInterrupt(digitalPinToInterrupt(manualTurnPin));
+  attachInterrupt(digitalPinToInterrupt(manualTurnPin), interruptStop, FALLING);
+  if(!startMovement)
+  {
+    analogWrite(analogPin2, 75);
+    analogWrite(analogPin3, 0);
+    analogWrite(analogPin7, 0);
+    analogWrite(analogPin8, 75);
+  } 
+}
+
+void interruptStop()
+{
+  detachInterrupt(digitalPinToInterrupt(manualForwardPin));
+  attachInterrupt(digitalPinToInterrupt(manualForwardPin), manualForwardStart, RISING);
+  attachInterrupt(digitalPinToInterrupt(manualBackwardPin), manualBackwardStart, RISING);
+  attachInterrupt(digitalPinToInterrupt(manualTurnPin), manualTurnStart, RISING);
+  outputStopCart();
+}
+

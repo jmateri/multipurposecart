@@ -327,15 +327,15 @@ int main(int argc, char *argv[])
                 {
                     if(distance < 2 && (angle > 5) && (translation(1) < 0))
                     {
-                        outputRight = fmin(254,(int)((unsigned char)outputRight + angle * 3));
+                        outputRight = fmin(254,(int)((unsigned char)outputRight + angle * 1.6));
                            // (translation(0) * 10));
-                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - angle * 3));
+                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - angle * 1.6));
                     }
                     else if(distance < 2 && (angle > 5) && (translation(1) > 0))
                     {
-                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + angle * 3));
+                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + angle * 1.6));
                           //  (translation(0) * 10));;
-                        outputRight =  fmax(1,(int)((unsigned char)outputRight - angle * 3));
+                        outputRight =  fmax(1,(int)((unsigned char)outputRight - angle * 1.6));
                     }
                     else if((angle > 3) && (translation(1) < 0))
                     {
