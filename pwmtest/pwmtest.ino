@@ -1,179 +1,278 @@
 /*
- * Copyright 2017 Jonathan Materi & Nick DeNomme 
+ * Copyright 2017 Jonathan Materi and Nicholas DeNomme 
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ *
+ * This program is to control the functions of the Arduino, mainly to
+ * recieve and process data sent from the serial port and output the 
+ * correct pulse-width modulation signal to the motor controllers. It 
+ * also serves the function of receiving actions from the key fob to 
+ * manually control the cart from a distance. 
+ *
  */
 
-const int analogPin2 = 2;
-const int analogPin3 = 3;
-const int analogPin7 = 7;
+//Analog PWM output pins for motor controllers
+//Pins 8 and 9 are for one motor controller, 10 and 11 for the other
 const int analogPin8 = 8;
+const int analogPin9 = 9;
+const int analogPin10 = 10;
+const int analogPin11 = 11;
+
+//Pins for controlling the cart manually with the key fob
 const int stopPin = 18;
 const int manualForwardPin = 19;
 const int manualBackwardPin = 20;
 const int manualTurnPin = 21;
 
-int incomingByte1 = 0;
-int incomingByte2 = 0;
+//Bytes received from the serial port
+int incomingDirectionByte = 0;
+int incomingSpeedByte = 0;
+
+//Time in milliseconds that's passed since the program started
 long unsigned int elapsedTime;
+
+//True means the cart will move. False will mean it will stop
 volatile bool startMovement = true;
 
+//Function Declarations
 void inline timeoutCart();
 void inline outputStopCart();
 
 void setup()
 {
-  pinMode(analogPin2, OUTPUT);   // sets the pin as output
-  pinMode(analogPin3, OUTPUT);
-  pinMode(analogPin7, OUTPUT);   // sets the pin as output
-  pinMode(analogPin8, OUTPUT);
+  //Sets PWM pins as output pins
+  pinMode(analogPin8, OUTPUT);   
+  pinMode(analogPin9, OUTPUT);
+  pinMode(analogPin10, OUTPUT);   
+  pinMode(analogPin11, OUTPUT);
 
+  //Sets pins for manually controlling the cart as interrupt pins
   pinMode(stopPin, INPUT_PULLUP);
   pinMode(manualForwardPin, INPUT_PULLUP);
   pinMode(manualBackwardPin, INPUT_PULLUP);
   pinMode(manualTurnPin, INPUT_PULLUP);
   
-  attachInterrupt(digitalPinToInterrupt(stopPin), stopCart, RISING);
+  //Attaches functions to interrupt pins to function is called when pin receives a rising edge
+  attachInterrupt(digitalPinToInterrupt(stopPin), manualStopCart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualForwardPin), manualForwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualBackwardPin), manualBackwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualTurnPin), manualTurnStart, RISING);
   
+  //Stop cart at beginning
   outputStopCart();
   
+  //Set serial port baud rate to 9600
   Serial.begin(9600);
 }
 
 
-
 void loop()
 {
+  //Check if data is available from serial port
   if (Serial.available() > 1)
   {
-    incomingByte1 = Serial.read();
+	//Read one byte of data to determine direction
+    incomingDirectionByte = Serial.read();
     
-    if(incomingByte1 == 255 || incomingByte1 == 0)
+	//Confirm that the byte signals a valid direction. 255 or 0 determines
+	//the side of the cart that moves. (e.g. 255 is for the right wheels and 0 
+	//is for the left wheels. It doesn't really matter which side is which in 
+	//the program, since you can just flip the wiring if it's wrong. If it's 
+	//not 255 or 0, it's not a direction byte and the program will ignore it
+    if((incomingDirectionByte == 255) || (incomingDirectionByte == 0))
     {
-     incomingByte2 = Serial.read();
-     if(incomingByte2 > 254)
+     //Read byte for speed. Should be between 1 and 254, inclusive
+     incomingSpeedByte = Serial.read();
+	 
+	 //If for some reason the byte is greater or less than the bounds, cap it at the max
+	 //to avoid unexpected behavior
+     if(incomingSpeedByte > 254)
      {
-       incomingByte2 = 254;
+       incomingSpeedByte = 254;
      }
-     if(incomingByte2 < 1)
+     if(incomingSpeedByte < 1)
      {
-       incomingByte2 = 1;
+       incomingSpeedByte = 1;
      }
-  
-    if(incomingByte1 == 255 && startMovement)
+    
+	//If movement is true, move one side (left or right) of the cart's wheels
+    if((incomingDirectionByte == 255) && startMovement)
     {
-      if(incomingByte2 >= 127)
+	  //Determines direction. Greater than 127 is forward, less than 127 is backward
+      if(incomingSpeedByte >= 127)
       {
-        incomingByte2 -= 127;
-        incomingByte2 <<= 1;
-        analogWrite(analogPin3, 0);
-        analogWrite(analogPin2, incomingByte2);
-        
+		//This is to normalize the speed for the motor controller. Outputing zero one
+		//one pin and the speed on the other will cause the wheel to move. Flipping the
+		//pins so that zero and speed are on the opposite will cause the cart to move the
+		//other direction
+        incomingSpeedByte -= 127;
+        incomingSpeedByte <<= 1; //Multiply by 2 to normalize speed to get from zero to 255
+		
+		//Write speed and direction to the pins
+		analogWrite(analogPin8, incomingSpeedByte);
+        analogWrite(analogPin9, 0);
       }
       else
       {
-        incomingByte2 = 127 - incomingByte2;
-        incomingByte2 <<= 1;
-        analogWrite(analogPin2, 0);
-        analogWrite(analogPin3, incomingByte2);
+		//Same as above but for the opposite direction
+        incomingSpeedByte = 127 - incomingSpeedByte;
+        incomingSpeedByte <<= 1; //Multiply by 2 to normalize
+		
+		//Write speed and direction to pins
+        analogWrite(analogPin8, 0);
+        analogWrite(analogPin9, incomingSpeedByte);
       }
     }
-    else if(incomingByte1 == 0 && startMovement)
+	//If movement is true, move other side of the cart's wheels
+    else if((incomingDirectionByte == 0) && startMovement)
     {
-      if(incomingByte2 >= 127)
+      if(incomingSpeedByte >= 127)
       {
-        incomingByte2 -= 127;
-        incomingByte2 <<= 1;
-        analogWrite(analogPin7, incomingByte2);
-        analogWrite(analogPin8, 0);
+		//This is to normalize the speed for the motor controller. Outputing zero one
+		//one pin and the speed on the other will cause the wheel to move. Flipping the
+		//pins so that zero and speed are on the opposite will cause the cart to move the
+		//other direction
+        incomingSpeedByte -= 127;
+        incomingSpeedByte <<= 1; //Multiply by 2 to normalize
+		
+		//Write speed and direction to pins
+        analogWrite(analogPin10, incomingSpeedByte);
+        analogWrite(analogPin11, 0);
       }
       else
       {
-        incomingByte2 = 127 - incomingByte2;
-        incomingByte2 <<= 1;
-        analogWrite(analogPin7, 0);
-        analogWrite(analogPin8, incomingByte2);
+		//Same as above but for the opposite direction
+        incomingSpeedByte = 127 - incomingSpeedByte;
+        incomingSpeedByte <<= 1; //Multiply by 2 to normalize
+		
+		//Write speed and direction to pins
+        analogWrite(analogPin10, 0);
+        analogWrite(analogPin11, incomingSpeedByte);
       }
     }   
+	//If byte is received, get ellapsed time since program has run in milliseconds
     elapsedTime = millis(); 
    }
   }
+  
+  //Timeout cart if no byte has been received after a certain amount of time
   timeoutCart();
 }
 
+//Stop cart from moving
 void inline outputStopCart()
 {
-  analogWrite(analogPin2, 0);
-  analogWrite(analogPin3, 0);
-  analogWrite(analogPin7, 0);
   analogWrite(analogPin8, 0);
+  analogWrite(analogPin9, 0);
+  analogWrite(analogPin10, 0);
+  analogWrite(analogPin11, 0);
 }
 
+//Stop cart from moving if it doesn't receive data after a given amount of time
+//This prevents the cart from unexpectedly running into walls and such
 void inline timeoutCart()
 {
+  //Get current time and subtract the time since the last byte was received.
+  //If the time is greater than 333 milliseconds (1/3 second), stop the cart.
   if((millis() - elapsedTime > 333) && startMovement)
   {
     outputStopCart();
+	
+	//Keep cart stopped until more serial data is available.
     while(Serial.available() == 0);
   }
 }
 
-void stopCart()
-{
-  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);                       // wait for a second
-  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-  delay(1000);  
+//Stop cart if key fob stop button is pressed. This function is connected to
+//an interrupt
+void manualStopCart()
+{ 
+ //Stop the cart
  outputStopCart();
+ 
+ //Toggle each time the button is pressed to stop/start the cart
  startMovement = !startMovement; 
 }
 
+//Move the cart forward manually if the forward button is pressed. This function is
+//connected to an interrupt
 void manualForwardStart()
 {
+  //Change interrupt to change on falling edge, to stop cart after the forward button 
+  //has been released
   detachInterrupt(digitalPinToInterrupt(manualForwardPin));
   attachInterrupt(digitalPinToInterrupt(manualForwardPin), interruptStop, FALLING);
+  
+  //Only go to manual mode if cart is stopped
   if(!startMovement)
   {
-    analogWrite(analogPin2, 75);
-    analogWrite(analogPin3, 0);
-    analogWrite(analogPin7, 75);
-    analogWrite(analogPin8, 0);
+	//Move cart forward at a constant speed
+    analogWrite(analogPin8, 75);
+    analogWrite(analogPin9, 0);
+    analogWrite(analogPin10, 75);
+    analogWrite(analogPin11, 0);
   }
 }
 
+//Move the cart backward manually if the backward button is pressed. This function is
+//connected to an interrupt
 void manualBackwardStart()
 {
+  //Change interrupt to change on falling edge, to stop cart after the backward button 
+  //has been released
   detachInterrupt(digitalPinToInterrupt(manualBackwardPin));
   attachInterrupt(digitalPinToInterrupt(manualBackwardPin), interruptStop, FALLING);
+  
+  //Only go to manual mode if cart is stopped
   if(!startMovement)
   {
-    analogWrite(analogPin2, 0);
-    analogWrite(analogPin3, 100);
-    analogWrite(analogPin7, 0);
-    analogWrite(analogPin8, 100);
+	//Move cart backward at a constant speed
+    analogWrite(analogPin8, 0);
+    analogWrite(analogPin9, 100);
+    analogWrite(analogPin10, 0);
+    analogWrite(analogPin11, 100);
   }
 }
 
+//Turn the cart manually if the turn button is pressed. This function is connected to
+//an interrupt
 void manualTurnStart()
 {
+  //Change interrupt to change on falling edge, to stop cart after the turn button 
+  //has been released
   detachInterrupt(digitalPinToInterrupt(manualTurnPin));
   attachInterrupt(digitalPinToInterrupt(manualTurnPin), interruptStop, FALLING);
+  
+  //Only go to manual mode if cart is stopped
   if(!startMovement)
   {
-    analogWrite(analogPin2, 75);
-    analogWrite(analogPin3, 0);
-    analogWrite(analogPin7, 0);
+	//Turn at a constant speed
     analogWrite(analogPin8, 75);
+    analogWrite(analogPin9, 0);
+    analogWrite(analogPin10, 0);
+    analogWrite(analogPin11, 75);
   } 
 }
 
+//Stop cart upon manual button being released
 void interruptStop()
 {
+  //Reset all inerrupts to activate on a rising edge to detect if a button is pressed again
   detachInterrupt(digitalPinToInterrupt(manualForwardPin));
   attachInterrupt(digitalPinToInterrupt(manualForwardPin), manualForwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualBackwardPin), manualBackwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualTurnPin), manualTurnStart, RISING);
+  
+  //Stop cart
   outputStopCart();
 }
-
