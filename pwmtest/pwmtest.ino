@@ -1,4 +1,4 @@
-/*
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * Copyright 2017 Jonathan Materi and Nicholas DeNomme 
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,22 +17,34 @@
  * recieve and process data sent from the serial port and output the 
  * correct pulse-width modulation signal to the motor controllers. It 
  * also serves the function of receiving actions from the key fob to 
- * manually control the cart from a distance. 
+ * manually control the cart from a distance, and controls the neopixels.
  *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  */
+
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+  #include <avr/power.h>
+#endif
 
 //Analog PWM output pins for motor controllers
 //Pins 8 and 9 are for one motor controller, 10 and 11 for the other
-const int analogPin8 = 8;
-const int analogPin9 = 9;
-const int analogPin10 = 10;
-const int analogPin11 = 11;
+const short int analogPin8 = 8;
+const short int analogPin9 = 9;
+const short int analogPin10 = 10;
+const short int analogPin11 = 11;
+
+//Pins for the neo Pixels
+const short int neoPixelPin1 = 12;
+const short int neoPixelPin2 = 13;
+const short int neoPixelCount = 8;
+Adafruit_NeoPixel pixels1, pixels2;
 
 //Pins for controlling the cart manually with the key fob
-const int stopPin = 18;
-const int manualForwardPin = 19;
-const int manualBackwardPin = 20;
-const int manualTurnPin = 21;
+const short int stopPin = 18;
+const short int manualForwardPin = 19;
+const short int manualBackwardPin = 20;
+const short int manualTurnPin = 21;
 
 //Bytes received from the serial port
 int incomingDirectionByte = 0;
@@ -47,6 +59,11 @@ volatile bool startMovement = true;
 //Function Declarations
 void inline timeoutCart();
 void inline outputStopCart();
+void inline ledWrite(int pixelNumber, int red, int green, int blue);
+void inline setAllPixels(int red, int green, int blue);
+void pixelStartup(int red1, int green1, int blue1, int red2, int green2, int blue2);
+
+bool backwards1 = false, backwards2 = false;
 
 void setup()
 {
@@ -73,6 +90,13 @@ void setup()
   
   //Set serial port baud rate to 9600
   Serial.begin(9600);
+
+  //Set up neo pixels
+  pixels1 = Adafruit_NeoPixel(neoPixelCount, neoPixelPin1, NEO_GRB + NEO_KHZ800);
+  pixels2 = Adafruit_NeoPixel(neoPixelCount, neoPixelPin2, NEO_GRB + NEO_KHZ800);
+  pixels1.begin();
+  pixels2.begin();
+  pixelStartup(0,255,0,255,125,0);
 }
 
 
@@ -80,7 +104,16 @@ void loop()
 {
   //Check if data is available from serial port
   if (Serial.available() > 1)
-  {
+  {    
+    if(backwards1 && backwards2)
+    {
+      setAllPixels(255,125,0);
+    }
+    else
+    {
+      setAllPixels(0,255,0);
+    }
+
 	//Read one byte of data to determine direction
     incomingDirectionByte = Serial.read();
     
@@ -111,6 +144,8 @@ void loop()
 	  //Determines direction. Greater than 127 is forward, less than 127 is backward
       if(incomingSpeedByte >= 127)
       {
+        backwards1 = false;
+        
 		//This is to normalize the speed for the motor controller. Outputing zero one
 		//one pin and the speed on the other will cause the wheel to move. Flipping the
 		//pins so that zero and speed are on the opposite will cause the cart to move the
@@ -124,6 +159,7 @@ void loop()
       }
       else
       {
+        backwards1 = true;
 		//Same as above but for the opposite direction
         incomingSpeedByte = 127 - incomingSpeedByte;
         incomingSpeedByte <<= 1; //Multiply by 2 to normalize
@@ -138,6 +174,7 @@ void loop()
     {
       if(incomingSpeedByte >= 127)
       {
+        backwards2 = false;
 		//This is to normalize the speed for the motor controller. Outputing zero one
 		//one pin and the speed on the other will cause the wheel to move. Flipping the
 		//pins so that zero and speed are on the opposite will cause the cart to move the
@@ -151,6 +188,7 @@ void loop()
       }
       else
       {
+        backwards2 = true;
 		//Same as above but for the opposite direction
         incomingSpeedByte = 127 - incomingSpeedByte;
         incomingSpeedByte <<= 1; //Multiply by 2 to normalize
@@ -171,11 +209,12 @@ void loop()
 
 //Stop cart from moving
 void inline outputStopCart()
-{
+{ 
   analogWrite(analogPin8, 0);
   analogWrite(analogPin9, 0);
   analogWrite(analogPin10, 0);
   analogWrite(analogPin11, 0);
+  setAllPixels(255,0,0);
 }
 
 //Stop cart from moving if it doesn't receive data after a given amount of time
@@ -187,9 +226,8 @@ void inline timeoutCart()
   if((millis() - elapsedTime > 333) && startMovement)
   {
     outputStopCart();
-	
-	//Keep cart stopped until more serial data is available.
-    while(Serial.available() == 0);
+
+    pixelStartup(255,0,0,255,0,0);
   }
 }
 
@@ -216,6 +254,7 @@ void manualForwardStart()
   //Only go to manual mode if cart is stopped
   if(!startMovement)
   {
+    setAllPixels(0,0,255);
 	//Move cart forward at a constant speed
     analogWrite(analogPin8, 75);
     analogWrite(analogPin9, 0);
@@ -236,6 +275,7 @@ void manualBackwardStart()
   //Only go to manual mode if cart is stopped
   if(!startMovement)
   {
+    setAllPixels(0,0,255);
 	//Move cart backward at a constant speed
     analogWrite(analogPin8, 0);
     analogWrite(analogPin9, 100);
@@ -256,6 +296,7 @@ void manualTurnStart()
   //Only go to manual mode if cart is stopped
   if(!startMovement)
   {
+    setAllPixels(0,0,255);
 	//Turn at a constant speed
     analogWrite(analogPin8, 75);
     analogWrite(analogPin9, 0);
@@ -276,3 +317,56 @@ void interruptStop()
   //Stop cart
   outputStopCart();
 }
+
+void inline ledWrite(int pixelNumber, int red, int green, int blue)
+{
+   pixels1.setPixelColor(pixelNumber, pixels1.Color(red,green,blue));
+   pixels2.setPixelColor(pixelNumber, pixels2.Color(red,green,blue));
+   pixels1.show();
+   pixels2.show();
+}
+
+void inline setAllPixels(int red, int green, int blue)
+{
+  for(int i = 0; i < neoPixelCount; i++)
+  {
+    pixels1.setPixelColor(i,pixels1.Color(red,green,blue));
+    pixels2.setPixelColor(i,pixels2.Color(red,green,blue));
+  }
+  pixels1.show();
+  pixels2.show();
+}
+
+void pixelStartup(int red1, int green1, int blue1, int red2, int green2, int blue2)
+{
+  for(int i = 0; Serial.available() == 0; i++)
+  {
+    for(int j = 0; j < neoPixelCount; j++)
+    {
+      if(i % 2 == 0)
+      {
+        if(j % 2 == 0)
+        {
+          ledWrite(j,red1,green1,blue1);
+        }
+        else
+        {
+          ledWrite(j,0,0,0);
+        }
+      }
+      else
+      {
+        if(j % 2 == 1)
+        {
+          ledWrite(j,red2,green2,blue2);
+        }
+        else
+        {
+          ledWrite(j,0,0,0);
+        }
+      }
+    }
+    delay(500);
+  } 
+}
+
