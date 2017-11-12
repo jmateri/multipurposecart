@@ -102,9 +102,9 @@ void loop() {
   //Check if data is available from serial port
   if (Serial.available() > 1) {
     //Neo pixels are green until both sides move backward, then they're yellow
-    if (backwards1 && backwards2) {
+    if ((backwards1 && backwards2) && startMovement) {
       setAllPixels(255, 125, 0);
-    } else {
+    } else if (startMovement){
       setAllPixels(0, 255, 0);
     }
 
@@ -238,9 +238,9 @@ void manualForwardStart() {
     setAllPixels(0, 0, 255);
 
     //Move cart forward at a constant speed
-    analogWrite(analogPin8, 75);
+    analogWrite(analogPin8, 80);
     analogWrite(analogPin9, 0);
-    analogWrite(analogPin10, 75);
+    analogWrite(analogPin10, 80);
     analogWrite(analogPin11, 0);
   }
 }
@@ -260,9 +260,9 @@ void manualBackwardStart() {
 
     //Move cart backward at a constant speed
     analogWrite(analogPin8, 0);
-    analogWrite(analogPin9, 100);
+    analogWrite(analogPin9, 80);
     analogWrite(analogPin10, 0);
-    analogWrite(analogPin11, 100);
+    analogWrite(analogPin11, 80);
   }
 }
 
@@ -280,10 +280,10 @@ void manualTurnStart() {
     setAllPixels(0, 0, 255);
 
     //Turn at a constant speed
-    analogWrite(analogPin8, 75);
+    analogWrite(analogPin8, 100);
     analogWrite(analogPin9, 0);
     analogWrite(analogPin10, 0);
-    analogWrite(analogPin11, 75);
+    analogWrite(analogPin11, 100);
   }
 }
 

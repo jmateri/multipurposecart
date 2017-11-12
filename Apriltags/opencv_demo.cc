@@ -30,6 +30,7 @@ of the authors and should not be interpreted as representing official policies,
 either expressed or implied, of the Regents of The University of Michigan.
 */
 
+//Headers included by Apriltags creators
 #include <iostream>
 #include "opencv2/opencv.hpp"
 #include <eigen3/Eigen/Dense>
@@ -42,14 +43,19 @@ either expressed or implied, of the Regents of The University of Michigan.
 #include "getopt.h"
 #include <math.h>
 #include <cmath>
+
+//Our included Headers
 #include <QCoreApplication>
 #include <QtSerialPort/QSerialPort>
 #include <QSerialPortInfo>
 #include <QDebug>
 #include <QTime>
+
 using namespace std;
 using namespace cv;
 
+
+//Builtin function used for trig calculations
 inline double standardRad(double t) {
     double PI = 3.14159265358979323846;
     double TWOPI = 2.0*PI;
@@ -80,17 +86,19 @@ int main(int argc, char *argv[])
     getopt_add_bool(getopt, '1', "refine-decode", 0, "Spend more time trying to decode tags");
     getopt_add_bool(getopt, '2', "refine-pose", 0, "Spend more time trying to precisely localize tags");
 
-    //Paramenters we added
+    //Parameters for debugging and testing purposes
     bool arduino = true;
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
-    bool showFps = true;
-    double tagSize = 0.127; // April tag side length in meters of square black frame  (old one is .094)
+    bool showFps = true; //Prints the FPS that the camera is getting
+    bool turn = true; //Allows the cart to turn
+
+    //April tag calibration information
+    double tagSize = 0.127; // April tag side length in meters of square black frame
     double fx = 532.8497; // camera focal length in pixels
     double fy = 535.1190;
     double px = 312.4166; // camera principal point
     double py = 226.0692;
-    double horizontalPosition;
 
     // Checks console for paramenters
     if (!getopt_parse(getopt, argc, argv, 1) ||  getopt_get_bool(getopt, "help"))
@@ -147,15 +155,19 @@ int main(int argc, char *argv[])
     td->refine_edges = getopt_get_bool(getopt, "refine-edges");
     td->refine_decode = getopt_get_bool(getopt, "refine-decode");
     td->refine_pose = getopt_get_bool(getopt, "refine-pose");
-    // Initalize variables for sending stuff over serial port
+
+    // Initalize variables for sending data over serial port
     QSerialPort port;
     QByteArray outputArrayLeft;
     QByteArray outputArrayRight;
-    // If we want to send stuff to arduino
+
+    //If true, data will be sent to the arduino
     if(arduino)
     {
+        //Gets list of available serial ports
         QList<QSerialPortInfo> info = QSerialPortInfo::availablePorts();
 
+        //Finds the port that the arduino is connected to automatically, if any
         int i;
         for(i=0; i<info.length(); i++)
         {
@@ -165,16 +177,19 @@ int main(int argc, char *argv[])
                 break;
             }
         }
+        //If arduino is not connected, end the program
         if( i == info.length())
         {
-            qDebug() << "No Device Found";
+            qDebug() << "No Arduino Device Found";
             return 1;
         }
-        // Open port of the arduino
+        // Close the arduino port if it's already open
         if(port.isOpen())
         {
             port.close();
         }
+
+        //Open arduino in Write only mode, set Baud to 9600, and configure other serial port parameters
         qDebug() << "Open: " << port.open(QIODevice::WriteOnly);
         qDebug() << "SetBaudRate: " << port.setBaudRate(QSerialPort::Baud9600);
         qDebug() << "SetDataBits: " << port.setDataBits(QSerialPort::Data8);
@@ -184,23 +199,32 @@ int main(int argc, char *argv[])
 
     }
     Mat frame, gray;
+
+    //Used for calculating the frames per second of the camera
     int frameCount;
     QTime timer;
     if (showFps)
     {
         timer.start();
     }
+
+    //Infinite loop for program to run forever
     while (true)
     {
         //Takes the frame and changes it to grayscale
         cap >> frame;
         cvtColor(frame, gray, COLOR_BGR2GRAY);
+
         // Make an image_u8_t header for the Mat data
         image_u8_t im = { .width = gray.cols, .height = gray.rows, .stride = gray.cols, .buf = gray.data };
+
         //puts all the detected tags into a zarray
         zarray_t *detections = apriltag_detector_detect(td, &im);
+
+        //Show frames per second, if desired
         if (showFps)
         {
+            //Increment frame count with each passing while loop
             frameCount++;
             if (timer.elapsed() >= 1000)
             {
@@ -209,6 +233,8 @@ int main(int argc, char *argv[])
                 frameCount = 0;
             }
         }
+
+        //Show if tags are detected
         if (showInfo)
         {
             cout << zarray_size(detections) << " tags detected" << endl;
@@ -265,24 +291,39 @@ int main(int argc, char *argv[])
             pitch = standardRad(atan2(-fixedRotation(2,0), fixedRotation(0,0)*c + fixedRotation(1,0)*s));
             roll  = standardRad(atan2(fixedRotation(0,2)*s - fixedRotation(1,2)*c, -fixedRotation(0,1)*s + fixedRotation(1,1)*c));
             distance = translation.norm();
+
+            //Used for sending data to the arduino
             if (arduino)
             {
+                //Treat all distances greater than 4 the same (basically infinite distance)
                 if(distance > 4)
+                {
                     distance = 4;
-                char outputRight;
-                char outputLeft;
-                char output;
-                int turnConstant = 40;
+                }
+
+                //Bytes that will be sent of the serial port for each side. They are chars since
+                //a char is one byte
+                char outputRight; //Byte sent to the right side
+                char outputLeft; //Byte sent to the left side
+                char output; //Not actually sent, just used for calculation purposes
+
+                //Clear Byte array each time so data is not resent
                 outputArrayLeft.clear();
                 outputArrayRight.clear();
+
+                //Append 255 to the left size, and 0 to the right side. The arduino will know data
+                //starting with 255 will be for the left motors, and data beginning with 0 will be
+                //for the right side motors
                 outputArrayLeft.append(255);
                 outputArrayRight.append((char) 0);
-                horizontalPosition = translation(1);
+
+                //If distance is greater than 1.2 meters, move forward
                 if (distance > 1.2)
                 {
-                   // output = (char)(((distance-1.2) *158.75)+127);
+                    //Formula for calculating speed based on distance
                     output = (char) 81.64 + 45.35 * distance;
-                  // output = (char) ((distance * ((16.199 * distance) - 38.8776)) + 150.327);
+
+                    //Cap the maximum output to be 254, since that's what the arduino can output for PWM
                     if(output >= 255)
                     {
                         output = 254;
@@ -293,17 +334,23 @@ int main(int argc, char *argv[])
                         outputLeft = output;
                     }
                 }
+
+                //If distance is between .8 and 1.2, stop the cart
                 else if(distance >= .8 && distance <= 1.2)
                 {
+                    //127 is stop
                     output = 127;
                     {
                         outputRight = output;
                         outputLeft = output;
                     }
                 }
+                //Otherwise, move the cart backward
                 else
-                {           // half of original scale factor
+                {
+                    //Formula for calculating backward distance
                     output = (char)(96.25 * distance + 50);
+                    //Cap minimum output at 1, since that's what the arduino can output for PWM
                     if(output <= 0)
                     {
                         output = 1;
@@ -313,87 +360,78 @@ int main(int argc, char *argv[])
                         outputRight = output;
                         outputLeft = output;
                     }
-
-
-
                 }
 
+                //Get the angle of the horizontal angle of the april tag and convert it to degrees
                 double angle = abs(atan(translation(1)/translation(0)) * (180 / 3.14159));
                 qDebug() << angle << " Angle";
-                double turnDifference =  (((-55.0 / 1369.0) * pow(angle - 40, 2)) + 60);
+
+                //Formula for calculating the angle the cart should turn when it's near
+                double turnDifferenceNear = angle * 1.6;
+
+                //Formula for calculating the angle the cart should turn when it's far away
+                double turnDifferenceFar =  (((-55.0 / 1369.0) * pow(angle - 40, 2)) + 60);
+
+                //Offset so the cart doesn't turn as sharp the faster it's going
                 double straightOffset = translation(0) * 15.0;
 
-                if(distance > 0 && true)
+                //Turns the cart if set
+                if(turn)
                 {
+                    //Turn cart sharply if tag is close and to the right
                     if(distance < 2 && (angle > 5) && (translation(1) < 0))
                     {
-                        outputRight = fmin(254,(int)((unsigned char)outputRight + angle * 1.6));
-                           // (translation(0) * 10));
-                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - angle * 1.6));
+                        //Add turn difference to one side and subtract it to the other to create the turn
+                        //Also cap it to not produce any overflow
+                        outputRight = fmin(254,(int)((unsigned char)outputRight + turnDifferenceNear));
+                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - turnDifferenceNear));
                     }
+                    //Turn cart sharply if tag is close and to the left
                     else if(distance < 2 && (angle > 5) && (translation(1) > 0))
                     {
-                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + angle * 1.6));
-                          //  (translation(0) * 10));;
-                        outputRight =  fmax(1,(int)((unsigned char)outputRight - angle * 1.6));
+                        //Add turn difference to one side and subtract it to the other to create the turn
+                        //Also cap it to not produce any overflow
+                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + turnDifferenceNear));
+                        outputRight =  fmax(1,(int)((unsigned char)outputRight - turnDifferenceNear));
                     }
+                    //Turn cart less sharp if tag is close and to the right
                     else if((angle > 3) && (translation(1) < 0))
                     {
-//                        outputRight = fmin(254,(int)(((unsigned char)outputRight) + 2.5 * angle));
-//                        outputLeft = fmax(1,(int)(((unsigned char)outputLeft) - 2.5 * angle));
+                        //Add turn difference to one side and subtract it to the other to create the turn
+                        //Also cap it to not produce any overflow
+                        outputRight = fmin(254,(int)((unsigned char)outputRight + turnDifferenceFar));
+                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - turnDifferenceFar));
 
-//                        qDebug() << (unsigned char) outputRight<< " Right";
-//                        qDebug() << (unsigned char) outputLeft << " Left";
-
-                        outputRight = fmin(254,(int)((unsigned char)outputRight + turnDifference));
-                           // (translation(0) * 10));
-                        outputLeft = fmax(1,(int)((unsigned char)outputLeft - turnDifference));
-
-                        if(turnDifference > straightOffset)
+                        if(turnDifferenceFar > straightOffset)
                         {
                             outputRight -= straightOffset;
                             outputLeft += straightOffset;
                         }
-
-                           // (translation(0) * 10));
-
                     }
+                    //turn cart less sharply if tag is close and to the left
                     else if((angle > 3) && (translation(1) > 0))
                     {
-//                        outputLeft = fmin(254,(int)(((unsigned char)outputLeft) + 2.5 * angle));
-//                        outputRight =  fmax(1,(int)(((unsigned char)outputRight) - 2.5 * angle));
-
-//                        qDebug() << (unsigned char) outputRight << " Right2";
-//                        qDebug() << (unsigned char) outputLeft << " Left2";
-
-
-                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + turnDifference));
-                          //  (translation(0) * 10));;
-                        outputRight =  fmax(1,(int)((unsigned char)outputRight - turnDifference));
-                          //  (translation(0) * 10));;
-                        if(turnDifference > straightOffset)
+                        //Add turn difference to one side and subtract it to the other to create the turn
+                        //Also cap it to not produce any overflow
+                        outputLeft = fmin(254,(int)((unsigned char)outputLeft + turnDifferenceFar));
+                        outputRight =  fmax(1,(int)((unsigned char)outputRight - turnDifferenceFar));
+                        if(turnDifferenceFar > straightOffset)
                         {
                             outputRight -= straightOffset;
                             outputLeft += straightOffset;
                         }
                     }
-
-
                 }
+
+                //Append motor speeds to byte array
                 outputArrayLeft.append(outputLeft);
                 outputArrayRight.append(outputRight);
-                if (true)
-                {
-                    qDebug() << (int) output + 127;
-                }
 
-
-
+                //Write to the serial port and flush to ensure data is written
                 qDebug() << port.write(outputArrayLeft);
                 port.flush();
                 qDebug() << port.write(outputArrayRight);
                 port.flush();
-                //port.waitForBytesWritten(50);
             }
             if (showInfo)
             {
