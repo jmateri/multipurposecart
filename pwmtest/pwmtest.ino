@@ -23,9 +23,6 @@
  */
 
 #include <Adafruit_NeoPixel.h>
-#ifdef __AVR__
-  #include <avr/power.h>
-#endif
 
 //Analog PWM output pins for motor controllers
 //Pins 8 and 9 are for one motor controller, 10 and 11 for the other
@@ -34,7 +31,7 @@ const short int analogPin9 = 9;
 const short int analogPin10 = 10;
 const short int analogPin11 = 11;
 
-//Pins for the neo Pixels
+//Pins and declarations for the neo Pixels
 const short int neoPixelPin1 = 12;
 const short int neoPixelPin2 = 13;
 const short int neoPixelCount = 8;
@@ -63,14 +60,14 @@ void inline ledWrite(int pixelNumber, int red, int green, int blue);
 void inline setAllPixels(int red, int green, int blue);
 void pixelStartup(int red1, int green1, int blue1, int red2, int green2, int blue2);
 
+//Used for neo pixel color for backwards movement. Will be yellow when both sides are moving backward
 bool backwards1 = false, backwards2 = false;
 
-void setup()
-{
+void setup() {
   //Sets PWM pins as output pins
-  pinMode(analogPin8, OUTPUT);   
+  pinMode(analogPin8, OUTPUT);
   pinMode(analogPin9, OUTPUT);
-  pinMode(analogPin10, OUTPUT);   
+  pinMode(analogPin10, OUTPUT);
   pinMode(analogPin11, OUTPUT);
 
   //Sets pins for manually controlling the cart as interrupt pins
@@ -78,16 +75,16 @@ void setup()
   pinMode(manualForwardPin, INPUT_PULLUP);
   pinMode(manualBackwardPin, INPUT_PULLUP);
   pinMode(manualTurnPin, INPUT_PULLUP);
-  
+
   //Attaches functions to interrupt pins to function is called when pin receives a rising edge
   attachInterrupt(digitalPinToInterrupt(stopPin), manualStopCart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualForwardPin), manualForwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualBackwardPin), manualBackwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualTurnPin), manualTurnStart, RISING);
-  
+
   //Stop cart at beginning
   outputStopCart();
-  
+
   //Set serial port baud rate to 9600
   Serial.begin(9600);
 
@@ -96,166 +93,151 @@ void setup()
   pixels2 = Adafruit_NeoPixel(neoPixelCount, neoPixelPin2, NEO_GRB + NEO_KHZ800);
   pixels1.begin();
   pixels2.begin();
-  pixelStartup(0,255,0,255,125,0);
+
+  //Start neo pixels with NDSU colors until movement begins
+  pixelStartup(0, 255, 0, 255, 125, 0);
 }
 
-
-void loop()
-{
+void loop() {
   //Check if data is available from serial port
-  if (Serial.available() > 1)
-  {    
-    if(backwards1 && backwards2)
-    {
-      setAllPixels(255,125,0);
-    }
-    else
-    {
-      setAllPixels(0,255,0);
+  if (Serial.available() > 1) {
+    //Neo pixels are green until both sides move backward, then they're yellow
+    if (backwards1 && backwards2) {
+      setAllPixels(255, 125, 0);
+    } else {
+      setAllPixels(0, 255, 0);
     }
 
-	//Read one byte of data to determine direction
+    //Read one byte of data to determine direction
     incomingDirectionByte = Serial.read();
-    
-	//Confirm that the byte signals a valid direction. 255 or 0 determines
-	//the side of the cart that moves. (e.g. 255 is for the right wheels and 0 
-	//is for the left wheels. It doesn't really matter which side is which in 
-	//the program, since you can just flip the wiring if it's wrong. If it's 
-	//not 255 or 0, it's not a direction byte and the program will ignore it
-    if((incomingDirectionByte == 255) || (incomingDirectionByte == 0))
-    {
-     //Read byte for speed. Should be between 1 and 254, inclusive
-     incomingSpeedByte = Serial.read();
-	 
-	 //If for some reason the byte is greater or less than the bounds, cap it at the max
-	 //to avoid unexpected behavior
-     if(incomingSpeedByte > 254)
-     {
-       incomingSpeedByte = 254;
-     }
-     if(incomingSpeedByte < 1)
-     {
-       incomingSpeedByte = 1;
-     }
-    
-	//If movement is true, move one side (left or right) of the cart's wheels
-    if((incomingDirectionByte == 255) && startMovement)
-    {
-	  //Determines direction. Greater than 127 is forward, less than 127 is backward
-      if(incomingSpeedByte >= 127)
-      {
-        backwards1 = false;
-        
-		//This is to normalize the speed for the motor controller. Outputing zero one
-		//one pin and the speed on the other will cause the wheel to move. Flipping the
-		//pins so that zero and speed are on the opposite will cause the cart to move the
-		//other direction
-        incomingSpeedByte -= 127;
-        incomingSpeedByte <<= 1; //Multiply by 2 to normalize speed to get from zero to 255
-		
-		//Write speed and direction to the pins
-		analogWrite(analogPin8, incomingSpeedByte);
-        analogWrite(analogPin9, 0);
+
+    //Confirm that the byte signals a valid direction. 255 or 0 determines
+    //the side of the cart that moves. (e.g. 255 is for the right wheels and 0 
+    //is for the left wheels. It doesn't really matter which side is which in 
+    //the program, since you can just flip the wiring if it's wrong. If it's 
+    //not 255 or 0, it's not a direction byte and the program will ignore it
+    if ((incomingDirectionByte == 255) || (incomingDirectionByte == 0)) {
+      //Read byte for speed. Should be between 1 and 254, inclusive
+      incomingSpeedByte = Serial.read();
+
+      //If for some reason the byte is greater or less than the bounds, cap it at the max
+      //to avoid unexpected behavior
+      if (incomingSpeedByte > 254) {
+        incomingSpeedByte = 254;
       }
-      else
-      {
-        backwards1 = true;
-		//Same as above but for the opposite direction
-        incomingSpeedByte = 127 - incomingSpeedByte;
-        incomingSpeedByte <<= 1; //Multiply by 2 to normalize
-		
-		//Write speed and direction to pins
-        analogWrite(analogPin8, 0);
-        analogWrite(analogPin9, incomingSpeedByte);
+      if (incomingSpeedByte < 1) {
+        incomingSpeedByte = 1;
       }
+
+      //If movement is true, move one side (left or right) of the cart's wheels
+      if ((incomingDirectionByte == 255) && startMovement) {
+        //Determines direction. Greater than 127 is forward, less than 127 is backward
+        if (incomingSpeedByte >= 127) {
+          backwards1 = false;
+
+          //This is to normalize the speed for the motor controller. Outputing zero one
+          //one pin and the speed on the other will cause the wheel to move. Flipping the
+          //pins so that zero and speed are on the opposite will cause the cart to move the
+          //other direction
+          incomingSpeedByte -= 127;
+          incomingSpeedByte <<= 1; //Multiply by 2 to normalize speed to get from zero to 255
+
+          //Write speed and direction to the pins
+          analogWrite(analogPin8, incomingSpeedByte);
+          analogWrite(analogPin9, 0);
+        } else {
+          backwards1 = true;
+          //Same as above but for the opposite direction
+          incomingSpeedByte = 127 - incomingSpeedByte;
+          incomingSpeedByte <<= 1; //Multiply by 2 to normalize
+
+          //Write speed and direction to pins
+          analogWrite(analogPin8, 0);
+          analogWrite(analogPin9, incomingSpeedByte);
+        }
+      }
+      //If movement is true, move other side of the cart's wheels
+      else if ((incomingDirectionByte == 0) && startMovement) {
+        if (incomingSpeedByte >= 127) {
+          backwards2 = false;
+          //This is to normalize the speed for the motor controller. Outputing zero one
+          //one pin and the speed on the other will cause the wheel to move. Flipping the
+          //pins so that zero and speed are on the opposite will cause the cart to move the
+          //other direction
+          incomingSpeedByte -= 127;
+          incomingSpeedByte <<= 1; //Multiply by 2 to normalize
+
+          //Write speed and direction to pins
+          analogWrite(analogPin10, incomingSpeedByte);
+          analogWrite(analogPin11, 0);
+        } else {
+          backwards2 = true;
+          //Same as above but for the opposite direction
+          incomingSpeedByte = 127 - incomingSpeedByte;
+          incomingSpeedByte <<= 1; //Multiply by 2 to normalize
+
+          //Write speed and direction to pins
+          analogWrite(analogPin10, 0);
+          analogWrite(analogPin11, incomingSpeedByte);
+        }
+      }
+      //If byte is received, get ellapsed time since program has run in milliseconds
+      elapsedTime = millis();
     }
-	//If movement is true, move other side of the cart's wheels
-    else if((incomingDirectionByte == 0) && startMovement)
-    {
-      if(incomingSpeedByte >= 127)
-      {
-        backwards2 = false;
-		//This is to normalize the speed for the motor controller. Outputing zero one
-		//one pin and the speed on the other will cause the wheel to move. Flipping the
-		//pins so that zero and speed are on the opposite will cause the cart to move the
-		//other direction
-        incomingSpeedByte -= 127;
-        incomingSpeedByte <<= 1; //Multiply by 2 to normalize
-		
-		//Write speed and direction to pins
-        analogWrite(analogPin10, incomingSpeedByte);
-        analogWrite(analogPin11, 0);
-      }
-      else
-      {
-        backwards2 = true;
-		//Same as above but for the opposite direction
-        incomingSpeedByte = 127 - incomingSpeedByte;
-        incomingSpeedByte <<= 1; //Multiply by 2 to normalize
-		
-		//Write speed and direction to pins
-        analogWrite(analogPin10, 0);
-        analogWrite(analogPin11, incomingSpeedByte);
-      }
-    }   
-	//If byte is received, get ellapsed time since program has run in milliseconds
-    elapsedTime = millis(); 
-   }
   }
-  
+
   //Timeout cart if no byte has been received after a certain amount of time
   timeoutCart();
 }
 
 //Stop cart from moving
-void inline outputStopCart()
-{ 
+void inline outputStopCart() {
   analogWrite(analogPin8, 0);
   analogWrite(analogPin9, 0);
   analogWrite(analogPin10, 0);
   analogWrite(analogPin11, 0);
-  setAllPixels(255,0,0);
+
+  //Solid red on neo pixels for stop
+  setAllPixels(255, 0, 0);
 }
 
 //Stop cart from moving if it doesn't receive data after a given amount of time
 //This prevents the cart from unexpectedly running into walls and such
-void inline timeoutCart()
-{
+void inline timeoutCart() {
   //Get current time and subtract the time since the last byte was received.
   //If the time is greater than 333 milliseconds (1/3 second), stop the cart.
-  if((millis() - elapsedTime > 333) && startMovement)
-  {
+  if ((millis() - elapsedTime > 333) && startMovement) {
     outputStopCart();
 
-    pixelStartup(255,0,0,255,0,0);
+    //Flash neo pixels red to indicate there's no visible tag
+    pixelStartup(255, 0, 0, 255, 0, 0);
   }
 }
 
 //Stop cart if key fob stop button is pressed. This function is connected to
 //an interrupt
-void manualStopCart()
-{ 
- //Stop the cart
- outputStopCart();
- 
- //Toggle each time the button is pressed to stop/start the cart
- startMovement = !startMovement; 
+void manualStopCart() {
+  //Stop the cart
+  outputStopCart();
+
+  //Toggle each time the button is pressed to stop/start the cart
+  startMovement = !startMovement;
 }
 
 //Move the cart forward manually if the forward button is pressed. This function is
 //connected to an interrupt
-void manualForwardStart()
-{
+void manualForwardStart() {
   //Change interrupt to change on falling edge, to stop cart after the forward button 
   //has been released
   detachInterrupt(digitalPinToInterrupt(manualForwardPin));
   attachInterrupt(digitalPinToInterrupt(manualForwardPin), interruptStop, FALLING);
-  
+
   //Only go to manual mode if cart is stopped
-  if(!startMovement)
-  {
-    setAllPixels(0,0,255);
-	//Move cart forward at a constant speed
+  if (!startMovement) {
+    //Set neo pixels blue for manual movement
+    setAllPixels(0, 0, 255);
+
+    //Move cart forward at a constant speed
     analogWrite(analogPin8, 75);
     analogWrite(analogPin9, 0);
     analogWrite(analogPin10, 75);
@@ -265,18 +247,18 @@ void manualForwardStart()
 
 //Move the cart backward manually if the backward button is pressed. This function is
 //connected to an interrupt
-void manualBackwardStart()
-{
+void manualBackwardStart() {
   //Change interrupt to change on falling edge, to stop cart after the backward button 
   //has been released
   detachInterrupt(digitalPinToInterrupt(manualBackwardPin));
   attachInterrupt(digitalPinToInterrupt(manualBackwardPin), interruptStop, FALLING);
-  
+
   //Only go to manual mode if cart is stopped
-  if(!startMovement)
-  {
-    setAllPixels(0,0,255);
-	//Move cart backward at a constant speed
+  if (!startMovement) {
+    //Set neo pixels blue for manual movement
+    setAllPixels(0, 0, 255);
+
+    //Move cart backward at a constant speed
     analogWrite(analogPin8, 0);
     analogWrite(analogPin9, 100);
     analogWrite(analogPin10, 0);
@@ -286,87 +268,74 @@ void manualBackwardStart()
 
 //Turn the cart manually if the turn button is pressed. This function is connected to
 //an interrupt
-void manualTurnStart()
-{
+void manualTurnStart() {
   //Change interrupt to change on falling edge, to stop cart after the turn button 
   //has been released
   detachInterrupt(digitalPinToInterrupt(manualTurnPin));
   attachInterrupt(digitalPinToInterrupt(manualTurnPin), interruptStop, FALLING);
-  
+
   //Only go to manual mode if cart is stopped
-  if(!startMovement)
-  {
-    setAllPixels(0,0,255);
-	//Turn at a constant speed
+  if (!startMovement) {
+    //Set neo pixels blue for manual movement
+    setAllPixels(0, 0, 255);
+
+    //Turn at a constant speed
     analogWrite(analogPin8, 75);
     analogWrite(analogPin9, 0);
     analogWrite(analogPin10, 0);
     analogWrite(analogPin11, 75);
-  } 
+  }
 }
 
 //Stop cart upon manual button being released
-void interruptStop()
-{
+void interruptStop() {
   //Reset all inerrupts to activate on a rising edge to detect if a button is pressed again
   detachInterrupt(digitalPinToInterrupt(manualForwardPin));
   attachInterrupt(digitalPinToInterrupt(manualForwardPin), manualForwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualBackwardPin), manualBackwardStart, RISING);
   attachInterrupt(digitalPinToInterrupt(manualTurnPin), manualTurnStart, RISING);
-  
+
   //Stop cart
   outputStopCart();
 }
 
-void inline ledWrite(int pixelNumber, int red, int green, int blue)
-{
-   pixels1.setPixelColor(pixelNumber, pixels1.Color(red,green,blue));
-   pixels2.setPixelColor(pixelNumber, pixels2.Color(red,green,blue));
-   pixels1.show();
-   pixels2.show();
+//Writes individual LED on the strip the given RGB color
+void inline ledWrite(int pixelNumber, int red, int green, int blue) {
+  pixels1.setPixelColor(pixelNumber, pixels1.Color(red, green, blue));
+  pixels2.setPixelColor(pixelNumber, pixels2.Color(red, green, blue));
+  pixels1.show();
+  pixels2.show();
 }
 
-void inline setAllPixels(int red, int green, int blue)
-{
-  for(int i = 0; i < neoPixelCount; i++)
-  {
-    pixels1.setPixelColor(i,pixels1.Color(red,green,blue));
-    pixels2.setPixelColor(i,pixels2.Color(red,green,blue));
+//Writes all LEDs on the strips the given RGB color
+void inline setAllPixels(int red, int green, int blue) {
+  for (int i = 0; i < neoPixelCount; i++) {
+    pixels1.setPixelColor(i, pixels1.Color(red, green, blue));
+    pixels2.setPixelColor(i, pixels2.Color(red, green, blue));
   }
   pixels1.show();
   pixels2.show();
 }
 
-void pixelStartup(int red1, int green1, int blue1, int red2, int green2, int blue2)
-{
-  for(int i = 0; Serial.available() == 0; i++)
-  {
-    for(int j = 0; j < neoPixelCount; j++)
-    {
-      if(i % 2 == 0)
-      {
-        if(j % 2 == 0)
-        {
-          ledWrite(j,red1,green1,blue1);
+//Flashes pixels back and forth between two colors. Doesn't resume until serial data
+//is available, or the stop button on the key fob is pressed.
+void pixelStartup(int red1, int green1, int blue1, int red2, int green2, int blue2) {
+  for (int i = 0; (Serial.available() == 0) && startMovement; i++) {
+    for (int j = 0; j < neoPixelCount; j++) {
+      if (i % 2 == 0) {
+        if (j % 2 == 0) {
+          ledWrite(j, red1, green1, blue1);
+        } else {
+          ledWrite(j, 0, 0, 0);
         }
-        else
-        {
-          ledWrite(j,0,0,0);
-        }
-      }
-      else
-      {
-        if(j % 2 == 1)
-        {
-          ledWrite(j,red2,green2,blue2);
-        }
-        else
-        {
-          ledWrite(j,0,0,0);
+      } else {
+        if (j % 2 == 1) {
+          ledWrite(j, red2, green2, blue2);
+        } else {
+          ledWrite(j, 0, 0, 0);
         }
       }
     }
     delay(500);
-  } 
+  }
 }
-
