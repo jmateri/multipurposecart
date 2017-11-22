@@ -87,18 +87,18 @@ int main(int argc, char *argv[])
     getopt_add_bool(getopt, '2', "refine-pose", 0, "Spend more time trying to precisely localize tags");
 
     //Parameters for debugging and testing purposes
-    bool arduino = true;
+    bool arduino = false;
     bool debugging = true; // displays camera view and draws lines on apriltags when detected
     bool showInfo = true; //Prints information to console
     bool showFps = true; //Prints the FPS that the camera is getting
-    bool turn = true; //Allows the cart to turn
+    bool turn = false; //Allows the cart to turn
 
     //April tag calibration information
     double tagSize = 0.127; // April tag side length in meters of square black frame
-    double fx = 532.8497; // camera focal length in pixels
-    double fy = 535.1190;
-    double px = 312.4166; // camera principal point
-    double py = 226.0692;
+    double fx = 203.718; // camera focal length in pixels
+    double fy = 203.718;
+    double px = 319.5; // camera principal point
+    double py = 239.5;
 
     // Checks console for paramenters
     if (!getopt_parse(getopt, argc, argv, 1) ||  getopt_get_bool(getopt, "help"))
@@ -110,6 +110,9 @@ int main(int argc, char *argv[])
 
     // Initialize camera
     VideoCapture cap(0);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH,640);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT,480);
+
     if (!cap.isOpened())
     {
         cerr << "Couldn't open video capture device" << endl;
@@ -213,6 +216,9 @@ int main(int argc, char *argv[])
     {
         //Takes the frame and changes it to grayscale
         cap >> frame;
+
+        qDebug() << frame.rows << " Rows";
+        qDebug() << frame.cols << " Cols";
         cvtColor(frame, gray, COLOR_BGR2GRAY);
 
         // Make an image_u8_t header for the Mat data
@@ -258,25 +264,35 @@ int main(int argc, char *argv[])
             imgPts.push_back(cv::Point2f(det->p[1][0], det->p[1][1]));
             imgPts.push_back(cv::Point2f(det->p[2][0], det->p[2][1]));
             imgPts.push_back(cv::Point2f(det->p[3][0], det->p[3][1]));
+            std::cout << "objPoints: "<< objPts << endl;
+            std::cout << "imgPoints: "<< imgPts << endl;
             cv::Mat rvec, tvec;
             cv::Matx33f cameraMatrix( fx, 0, px, 0, fy, py, 0,  0,  1);
             cv::Vec4f distParam(0,0,0,0);
             cv::solvePnP(objPts, imgPts, cameraMatrix, distParam, rvec, tvec);
+            std::cout << "rvec: "<< rvec << endl;
+            std::cout << "tvec: "<< tvec << endl;
             cv::Matx33d r;
             cv::Rodrigues(rvec, r);
+            std::cout << "R: "<< r << endl;
             Eigen::Matrix3d wRo;
             wRo << r(0,0), r(0,1), r(0,2), r(1,0), r(1,1), r(1,2), r(2,0), r(2,1), r(2,2);
+            std::cout << "wRo: "<< wRo << endl;
             Eigen::Matrix4d T;
             T.topLeftCorner(3,3) = wRo;
             T.col(3).head(3) << tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2);
             T.row(3) << 0,0,0,1;
             // converting from camera frame (z forward, x right, y down) to
             // object frame (x forward, y left, z up)
+            std::cout << "T: "<< T << endl;
             Eigen::Matrix4d M;
             M <<  0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1;
+            std::cout << M << endl;
             Eigen::Matrix4d MT = M*T;
+            std::cout << "MT: "<< MT << endl;
             // translation vector from camera to the April tag
             Eigen::Vector3d translation = MT.col(3).head(3);
+            std::cout << "translation: "<< translation << endl;
             // orientation of April tag with respect to camera: the camera
             // convention makes more sense here, because yaw,pitch,roll then
             // naturally agree with the orientation of the object
@@ -324,7 +340,7 @@ int main(int argc, char *argv[])
                     output = (char) 81.64 + 45.35 * distance;
 
                     //Cap the maximum output to be 254, since that's what the arduino can output for PWM
-                    if(output >= 255)
+                    if(output == 255)
                     {
                         output = 254;
                     }
