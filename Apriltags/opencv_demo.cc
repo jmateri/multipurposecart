@@ -264,35 +264,25 @@ int main(int argc, char *argv[])
             imgPts.push_back(cv::Point2f(det->p[1][0], det->p[1][1]));
             imgPts.push_back(cv::Point2f(det->p[2][0], det->p[2][1]));
             imgPts.push_back(cv::Point2f(det->p[3][0], det->p[3][1]));
-            std::cout << "objPoints: "<< objPts << endl;
-            std::cout << "imgPoints: "<< imgPts << endl;
             cv::Mat rvec, tvec;
             cv::Matx33f cameraMatrix( fx, 0, px, 0, fy, py, 0,  0,  1);
             cv::Vec4f distParam(0,0,0,0);
             cv::solvePnP(objPts, imgPts, cameraMatrix, distParam, rvec, tvec);
-            std::cout << "rvec: "<< rvec << endl;
-            std::cout << "tvec: "<< tvec << endl;
             cv::Matx33d r;
             cv::Rodrigues(rvec, r);
-            std::cout << "R: "<< r << endl;
             Eigen::Matrix3d wRo;
             wRo << r(0,0), r(0,1), r(0,2), r(1,0), r(1,1), r(1,2), r(2,0), r(2,1), r(2,2);
-            std::cout << "wRo: "<< wRo << endl;
             Eigen::Matrix4d T;
             T.topLeftCorner(3,3) = wRo;
             T.col(3).head(3) << tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2);
             T.row(3) << 0,0,0,1;
             // converting from camera frame (z forward, x right, y down) to
             // object frame (x forward, y left, z up)
-            std::cout << "T: "<< T << endl;
             Eigen::Matrix4d M;
             M <<  0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1;
-            std::cout << M << endl;
             Eigen::Matrix4d MT = M*T;
-            std::cout << "MT: "<< MT << endl;
             // translation vector from camera to the April tag
             Eigen::Vector3d translation = MT.col(3).head(3);
-            std::cout << "translation: "<< translation << endl;
             // orientation of April tag with respect to camera: the camera
             // convention makes more sense here, because yaw,pitch,roll then
             // naturally agree with the orientation of the object
@@ -380,7 +370,10 @@ int main(int argc, char *argv[])
 
                 //Get the angle of the horizontal angle of the april tag and convert it to degrees
                 double angle = abs(atan(translation(1)/translation(0)) * (180 / 3.14159));
-                qDebug() << angle << " Angle";
+                if (showInfo)
+                {
+                    qDebug() << angle << " Angle";
+                }
 
                 //Formula for calculating the angle the cart should turn when it's near
                 double turnDifferenceNear = angle * 1.6;
